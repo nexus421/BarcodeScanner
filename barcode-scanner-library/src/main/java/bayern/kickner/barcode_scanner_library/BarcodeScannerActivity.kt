@@ -31,18 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Zeigt eine Kamera-Vorschau in einer eigenen Activity an
  * In Kombination mit BarcodeScanner kann hier ein Barcode eingelesen werden.
  *
- * Benötigt:
- * GRADLE
- * implementation 'com.google.mlkit:barcode-scanning:16.1.1'
- * implementation "androidx.camera:camera-camera2:1.1.0-alpha04"
- * implementation "androidx.camera:camera-lifecycle:1.1.0-alpha04"
- * implementation "androidx.camera:camera-view:1.0.0-alpha24"
- * implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
- *
- * MANIFEST
- * <uses-feature android:name="android.hardware.camera.any"
- * <uses-permission android:name="android.permission.CAMERA"
- *
+ * TODO....
  * @author MK
  */
 private class BarcodeScannerActivity : AppCompatActivity() {
