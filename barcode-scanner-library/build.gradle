@@ -35,10 +35,9 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.5.0'
 
     api 'com.google.mlkit:barcode-scanning:17.0.2' //api == share this dependency. implementation == dependency is only for this module (here: the library)
-    implementation "androidx.camera:camera-camera2:1.2.0-alpha04"
-    implementation "androidx.camera:camera-lifecycle:1.2.0-alpha04"
-    implementation "androidx.camera:camera-view:1.2.0-alpha04"
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation "androidx.camera:camera-camera2:1.1.0"
+    implementation "androidx.camera:camera-lifecycle:1.1.0"
+    implementation "androidx.camera:camera-view:1.1.0"
 
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.5.1"
 }
