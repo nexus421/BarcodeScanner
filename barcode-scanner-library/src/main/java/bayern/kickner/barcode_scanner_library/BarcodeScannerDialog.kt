@@ -70,7 +70,7 @@ class BarcodeScannerDialog(
     }
 
     private fun initAfterPermissionCheck() {
-        rootView = View.inflate(activity, bayern.kickner.barcode_scanner_library.R.layout.activity_barcode_scanner, null) as LinearLayoutCompat
+        rootView = View.inflate(activity, bayern.kickner.barcode_scanner_library.R.layout.camera_dialog_layout, null) as LinearLayoutCompat
         rootView.children.forEach {
             if(it is TextView) it.text = title
             else if (it is PreviewView) viewFinder = it
