@@ -8,12 +8,14 @@ import android.view.View
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
+import androidx.core.view.children
 import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -52,7 +54,7 @@ class BarcodeScannerDialog(
 
     private lateinit var viewFinder: PreviewView
     private lateinit var dialog: AlertDialog
-    private lateinit var rootView: View
+    private lateinit var rootView: LinearLayoutCompat
 
     init {
 
@@ -68,15 +70,17 @@ class BarcodeScannerDialog(
     }
 
     private fun initAfterPermissionCheck() {
-        rootView = View.inflate(activity, R.layout.camera_dialog_layout, null)
-        rootView.findViewById<TextView>(R.id.tvHeadline).text = title
+        rootView = View.inflate(activity, R.layout.camera_dialog_layout, null) as LinearLayoutCompat
+        rootView.children.forEach {
+            if(it is TextView) it.text = title
+            else if (it is PreviewView) viewFinder = it
+        }
 
         dialog = AlertDialog.Builder(activity)
             .setView(rootView)
             .setCancelable(true)
             .create()
 
-        viewFinder = rootView.findViewById(R.id.viewFinder)
 
         startCamera()
         show()
