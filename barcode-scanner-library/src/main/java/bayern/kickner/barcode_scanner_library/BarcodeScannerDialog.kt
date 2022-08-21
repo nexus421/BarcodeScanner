@@ -15,7 +15,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
-import androidx.core.view.children
 import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -70,17 +69,15 @@ class BarcodeScannerDialog(
     }
 
     private fun initAfterPermissionCheck() {
-        rootView = View.inflate(activity, bayern.kickner.barcode_scanner_library.R.layout.camera_dialog_layout, null) as LinearLayoutCompat
-        rootView.children.forEach {
-            if(it is TextView) it.text = title
-            else if (it is PreviewView) viewFinder = it
-        }
+        //If you have an xml with the same name, your app will crash. Reason: This class will use your Layout, not this one.
+        rootView = View.inflate(activity, R.layout.camera_dialog_layout, null) as LinearLayoutCompat
+        rootView.findViewById<TextView>(R.id.tvHeadline).text = title
+        viewFinder = rootView.findViewById(R.id.viewFinder)
 
         dialog = AlertDialog.Builder(activity)
             .setView(rootView)
             .setCancelable(true)
             .create()
-
 
         startCamera()
         show()
