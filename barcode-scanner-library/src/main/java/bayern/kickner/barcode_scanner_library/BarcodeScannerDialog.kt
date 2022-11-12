@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @see https://codelabs.developers.google.com/codelabs/camerax-getting-started
  * @author MK
  *
+ * @param ignorePermissionCheck If you are using this inside compose, don't handle permission-check here (set to true!). Do it on your own. Otherwise your App will crash, when the permission is not given to your App!
  *
  * ToDo: Hier könnte man auch über Parameter und dem zugehörigen ML Kit einen Text einscannen. Datum automatisch erkennen! xx.xx.xxxx
  */
@@ -48,6 +49,7 @@ class BarcodeScannerDialog(
         .build(),
     private val title: String = "Barcode scannen",
     private val missingPermissionText: String = "Kamera-Berechtigung verweigert.",
+    private val ignorePermissionCheck: Boolean = false,
     private val barcode: (String) -> Unit
 ) {
 
@@ -56,6 +58,7 @@ class BarcodeScannerDialog(
     private lateinit var rootView: LinearLayoutCompat
 
     init {
+        if (ignorePermissionCheck) initAfterPermissionCheck()
 
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PERMISSION_GRANTED) {
             initAfterPermissionCheck()

@@ -22,20 +22,21 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '11'
     }
 }
 
 dependencies {
 
-    implementation 'androidx.core:core-ktx:1.8.0'
-    implementation 'androidx.appcompat:appcompat:1.5.0'
+    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.5.1'
 
-    api 'com.google.mlkit:barcode-scanning:17.0.2' //api == share this dependency. implementation == dependency is only for this module (here: the library)
+    api 'com.google.mlkit:barcode-scanning:17.0.2'
+    //api == share this dependency. implementation == dependency is only for this module (here: the library) -> But we may need the BarcodeScannerOptions. So use api here
     implementation "androidx.camera:camera-camera2:1.1.0"
     implementation "androidx.camera:camera-lifecycle:1.1.0"
     implementation "androidx.camera:camera-view:1.1.0"
@@ -52,7 +53,7 @@ afterEvaluate {
 
                 groupId = 'com.github.nexus421'
                 artifactId = 'BarcodeScanner'
-                version = '1.0.1'
+                version = '1.0.2'
             }
         }
     }
