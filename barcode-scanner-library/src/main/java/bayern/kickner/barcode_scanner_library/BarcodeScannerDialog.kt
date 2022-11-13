@@ -8,14 +8,15 @@ import android.view.View
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -50,32 +51,38 @@ class BarcodeScannerDialog(
     private val title: String = "Barcode scannen",
     private val missingPermissionText: String = "Kamera-Berechtigung verweigert.",
     private val ignorePermissionCheck: Boolean = false,
+    private val fabSetting: FabSetting? = null,
     private val barcode: (String) -> Unit
 ) {
 
     private lateinit var viewFinder: PreviewView
     private lateinit var dialog: AlertDialog
-    private lateinit var rootView: LinearLayoutCompat
+    private lateinit var rootView: ConstraintLayout
 
     init {
-        if (ignorePermissionCheck) initAfterPermissionCheck()
-
-        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PERMISSION_GRANTED) {
+        if (ignorePermissionCheck) {
             initAfterPermissionCheck()
         } else {
-            val launcher = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-                if (it) initAfterPermissionCheck()
-                else AlertDialog.Builder(activity).setTitle("Permission").setMessage(missingPermissionText).setPositiveButton("Ok") { d, _ -> d.dismiss() }.show()
+
+            if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PERMISSION_GRANTED) {
+                initAfterPermissionCheck()
+            } else {
+                val launcher = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+                    if (it) initAfterPermissionCheck()
+                    else AlertDialog.Builder(activity).setTitle("Permission").setMessage(missingPermissionText).setPositiveButton("Ok") { d, _ -> d.dismiss() }.show()
+                }
+                launcher.launch(Manifest.permission.CAMERA)
             }
-            launcher.launch(Manifest.permission.CAMERA)
         }
     }
 
     private fun initAfterPermissionCheck() {
         //If you have an xml with the same name, your app will crash. Reason: This class will use your Layout, not this one.
-        rootView = View.inflate(activity, R.layout.camera_dialog_layout, null) as LinearLayoutCompat
+        rootView = View.inflate(activity, R.layout.camera_dialog_layout, null) as ConstraintLayout
         rootView.findViewById<TextView>(R.id.tvHeadline).text = title
         viewFinder = rootView.findViewById(R.id.viewFinder)
+
+        prepareFab()
 
         dialog = AlertDialog.Builder(activity)
             .setView(rootView)
@@ -84,6 +91,18 @@ class BarcodeScannerDialog(
 
         startCamera()
         show()
+    }
+
+    private fun prepareFab() {
+        if (fabSetting == null) return
+
+        val fab = rootView.findViewById<FloatingActionButton>(R.id.fab)
+        fab.setImageDrawable(fabSetting.fabIcon)
+        fab.setOnClickListener {
+            fabSetting.onClick(dialog)
+        }
+        fab.visibility = View.VISIBLE
+
     }
 
     private fun startCamera() {
