@@ -34,7 +34,6 @@ dependencies {
 
     implementation 'androidx.core:core-ktx:1.9.0'
     implementation 'androidx.appcompat:appcompat:1.5.1'
-    implementation "com.google.android.material:material:1.7.0"
 
     api 'com.google.mlkit:barcode-scanning:17.0.2'
     //api == share this dependency. implementation == dependency is only for this module (here: the library) -> But we may need the BarcodeScannerOptions. So use api here
@@ -54,7 +53,7 @@ afterEvaluate {
 
                 groupId = 'com.github.nexus421'
                 artifactId = 'BarcodeScanner'
-                version = '1.0.4'
+                version = '1.0.5'
             }
         }
     }

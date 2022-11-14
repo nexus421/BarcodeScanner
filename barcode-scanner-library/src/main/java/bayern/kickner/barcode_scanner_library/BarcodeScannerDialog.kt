@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.graphics.Bitmap
 import android.util.Log
 import android.view.View
+import android.widget.ImageButton
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,7 +17,6 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -51,7 +51,7 @@ class BarcodeScannerDialog(
     private val title: String = "Barcode scannen",
     private val missingPermissionText: String = "Kamera-Berechtigung verweigert.",
     private val ignorePermissionCheck: Boolean = false,
-    private val fabSetting: FabSetting? = null,
+    private val buttonSettings: ButtonSettings? = null,
     private val barcode: (String) -> Unit
 ) {
 
@@ -94,14 +94,14 @@ class BarcodeScannerDialog(
     }
 
     private fun prepareFab() {
-        if (fabSetting == null) return
+        if (buttonSettings == null) return
 
-        val fab = rootView.findViewById<FloatingActionButton>(R.id.fab)
-        fab.setImageDrawable(fabSetting.fabIcon)
-        fab.setOnClickListener {
-            fabSetting.onClick(dialog)
+        val imgBtn = rootView.findViewById<ImageButton>(R.id.fab)
+        imgBtn.setImageDrawable(buttonSettings.fabIcon)
+        imgBtn.setOnClickListener {
+            buttonSettings.onClick(dialog)
         }
-        fab.visibility = View.VISIBLE
+        imgBtn.visibility = View.VISIBLE
 
     }
 
