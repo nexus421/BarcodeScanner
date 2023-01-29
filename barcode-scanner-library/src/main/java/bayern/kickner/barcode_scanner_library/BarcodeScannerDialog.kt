@@ -34,6 +34,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @author MK
  *
  * @param ignorePermissionCheck If you are using this inside compose, don't handle permission-check here (set to true!). Do it on your own. Otherwise your App will crash, when the permission is not given to your App!
+ * @param barcode Callback which will be called after an barcode was detected
+ * @param continuousScanSettings Scanns continually until finish or back is pressed, if not null
+ * @param buttonSettings Settings for the FAB on the bottom right. If set (not null) you can specify custom actions. Otherwise the Button is no visible
+ * @param options Set here the types of codes you want to search for. Default: TYPE_PRODUCT, FORMAT_QR_CODE, TYPE_ISBN, FORMAT_EAN_13 and FORMAT_EAN_8
  *
  * ToDo: Hier könnte man auch über Parameter und dem zugehörigen ML Kit einen Text einscannen. Datum automatisch erkennen! xx.xx.xxxx
  */
@@ -52,12 +56,15 @@ class BarcodeScannerDialog(
     private val missingPermissionText: String = "Kamera-Berechtigung verweigert.",
     private val ignorePermissionCheck: Boolean = false,
     private val buttonSettings: ButtonSettings? = null,
+    private val continuousScanSettings: ContinuousScanSettings? = null,
     private val barcode: (String) -> Unit
 ) {
 
     private lateinit var viewFinder: PreviewView
-    private lateinit var dialog: AlertDialog
+    lateinit var dialog: AlertDialog
     private lateinit var rootView: ConstraintLayout
+    private val search = AtomicBoolean(true)
+    private val timeToWaitAfterScan: Long = continuousScanSettings?.timeToWaitBetweenScans?.toLong() ?: 100
 
     init {
         if (ignorePermissionCheck) {
@@ -88,6 +95,10 @@ class BarcodeScannerDialog(
             .setView(rootView)
             .setCancelable(true)
             .create()
+
+        dialog.setOnDismissListener {
+            search.set(false)
+        }
 
         startCamera()
         show()
@@ -127,40 +138,41 @@ class BarcodeScannerDialog(
 
             activity.lifecycleScope.launch(Dispatchers.IO) {
                 delay(200)
-                val search = AtomicBoolean(true)
                 while (search.get()) {
                     withContext(Dispatchers.Main) {
                         val image = viewFinder.bitmap
                         if (image != null) {
-                            scanBarcode(image) {
-                                if (!it.isNullOrBlank() && search.get()) {
-                                    search.set(false)
-                                    barcode(it)
-                                    dismiss()
+                            scanBarcode(image) { scannedBarcode ->
+                                if (scannedBarcode.isNotBlank() && search.get()) {
+                                    if (continuousScanSettings != null) {
+                                        continuousScanSettings.checkInputAndReturnIfOk(scannedBarcode)?.let {
+                                            barcode(it)
+                                        }
+                                    } else {
+                                        search.set(false)
+                                        barcode(scannedBarcode)
+                                        dismiss()
+                                    }
                                 }
                             }
-
                         }
                     }
-                    delay(200)
+                    delay(timeToWaitAfterScan)
                 }
             }
         }, ContextCompat.getMainExecutor(activity))
     }
 
-    private fun scanBarcode(bitmap: Bitmap, result: (String?) -> Unit) {
+    private fun scanBarcode(bitmap: Bitmap, result: (String) -> Unit) {
         val image = InputImage.fromBitmap(bitmap, 0)
         val scanner = BarcodeScanning.getClient(options)
 
         scanner.process(image)
-            .addOnSuccessListener {
-                if (it.size == 1) {
-                    val barcode = it[0]
-                    result(barcode.rawValue)
-                    Log.d(
-                        "BarcodeScannerDialog",
-                        "Barcode: Type = ${barcode.valueType}, Value = ${barcode.rawValue}"
-                    )
+            .addOnSuccessListener { barcodes ->
+                if (barcodes.size == 1) {
+                    val barcode = barcodes[0]
+                    barcode.rawValue?.let { result(it) }
+                    Log.d("BarcodeScannerDialog", "Barcode: Type = ${barcode.valueType}, Value = ${barcode.rawValue}")
                 }
             }
             .addOnFailureListener { Log.e("BarcodeScannerDialog", "#scanBarcode", it) }

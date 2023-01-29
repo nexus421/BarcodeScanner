@@ -28,6 +28,7 @@ android {
     kotlinOptions {
         jvmTarget = '11'
     }
+    namespace 'bayern.kickner.barcode_scanner_library'
 }
 
 dependencies {
