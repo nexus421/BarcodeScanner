@@ -33,6 +33,18 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:contentDescription="Do smth"
-        android:visibility="visible" />
+        android:visibility="gone" />
+
+    <ImageButton
+        android:id="@+id/fabTorch"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_margin="4dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:contentDescription="Torch"
+        android:visibility="gone"
+        android:background="#4B000000"
+        android:src="@drawable/flashlight_on_24" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

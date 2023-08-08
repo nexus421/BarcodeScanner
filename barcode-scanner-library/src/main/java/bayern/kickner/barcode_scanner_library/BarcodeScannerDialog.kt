@@ -9,6 +9,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -38,6 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @param continuousScanSettings Scanns continually until finish or back is pressed, if not null
  * @param buttonSettings Settings for the FAB on the bottom right. If set (not null) you can specify custom actions. Otherwise the Button is no visible
  * @param options Set here the types of codes you want to search for. Default: TYPE_PRODUCT, FORMAT_QR_CODE, TYPE_ISBN, FORMAT_EAN_13 and FORMAT_EAN_8
+ * @param torch set the flashlight mode here. Default is off.
  *
  * ToDo: Hier könnte man auch über Parameter und dem zugehörigen ML Kit einen Text einscannen. Datum automatisch erkennen! xx.xx.xxxx
  */
@@ -45,18 +47,15 @@ class BarcodeScannerDialog(
     private val activity: ComponentActivity,
     private val options: BarcodeScannerOptions = BarcodeScannerOptions.Builder()
         .setBarcodeFormats(
-            Barcode.TYPE_PRODUCT,
-            Barcode.FORMAT_QR_CODE,
-            Barcode.TYPE_ISBN,
-            Barcode.FORMAT_EAN_13,
-            Barcode.FORMAT_EAN_8
+            Barcode.FORMAT_ALL_FORMATS
         )
         .build(),
     private val title: String = "Barcode scannen",
     private val missingPermissionText: String = "Kamera-Berechtigung verweigert.",
-    private val ignorePermissionCheck: Boolean = false,
+    private val ignorePermissionCheck: Boolean = true,
     private val buttonSettings: ButtonSettings? = null,
     private val continuousScanSettings: ContinuousScanSettings? = null,
+    private val torch: Torch = Torch.Off,
     private val barcode: (String) -> Unit
 ) {
 
@@ -65,6 +64,7 @@ class BarcodeScannerDialog(
     private lateinit var rootView: ConstraintLayout
     private val search = AtomicBoolean(true)
     private val timeToWaitAfterScan: Long = continuousScanSettings?.timeToWaitBetweenScans?.toLong() ?: 100
+
 
     init {
         if (ignorePermissionCheck) {
@@ -76,7 +76,8 @@ class BarcodeScannerDialog(
             } else {
                 val launcher = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
                     if (it) initAfterPermissionCheck()
-                    else AlertDialog.Builder(activity).setTitle("Permission").setMessage(missingPermissionText).setPositiveButton("Ok") { d, _ -> d.dismiss() }.show()
+                    else AlertDialog.Builder(activity).setTitle("Permission").setMessage(missingPermissionText)
+                        .setPositiveButton("Ok") { d, _ -> d.dismiss() }.show()
                 }
                 launcher.launch(Manifest.permission.CAMERA)
             }
@@ -90,6 +91,7 @@ class BarcodeScannerDialog(
         viewFinder = rootView.findViewById(R.id.viewFinder)
 
         prepareFab()
+        prepareTorch()
 
         dialog = AlertDialog.Builder(activity)
             .setView(rootView)
@@ -116,6 +118,30 @@ class BarcodeScannerDialog(
 
     }
 
+    private var torchOn = false
+
+    private fun prepareTorch() {
+        when (torch) {
+            Torch.ForceOn -> return //Directly handled inside startCamera()
+            Torch.Off -> return
+            Torch.Manual -> {
+                rootView.findViewById<ImageButton>(R.id.fabTorch).apply {
+                    visibility = View.VISIBLE
+                    setOnClickListener {
+                        torchOn = torchOn.not()
+                        try {
+                            camera.cameraControl.enableTorch(torchOn)
+                        } catch (e: Exception) {
+                            Log.e("Torch", "Error switching torch")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private lateinit var camera: Camera
+
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
 
@@ -125,15 +151,25 @@ class BarcodeScannerDialog(
                 .build()
                 .also {
                     it.setSurfaceProvider(viewFinder.surfaceProvider)
+
                 }
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
-            try {
+            camera = try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(activity, cameraSelector, preview)
             } catch (exc: Exception) {
                 Log.e("BarcodeScannerDialog", "Use case binding failed", exc)
+                null
+            } ?: return@addListener
+
+            if (torch == Torch.ForceOn) {
+                try {
+                    camera.cameraControl.enableTorch(true)
+                } catch (e: Exception) {
+                    Log.e("Torch", "Error turning on torch")
+                }
             }
 
             activity.lifecycleScope.launch(Dispatchers.IO) {
