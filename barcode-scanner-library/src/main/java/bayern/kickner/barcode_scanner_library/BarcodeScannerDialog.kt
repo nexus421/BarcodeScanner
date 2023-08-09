@@ -100,6 +100,11 @@ class BarcodeScannerDialog(
 
         dialog.setOnDismissListener {
             search.set(false)
+            try {
+                camera.cameraControl.enableTorch(false)
+            } catch (e: Exception) {
+                Log.e("Torch", "Error turning off torch")
+            }
         }
 
         startCamera()
@@ -151,7 +156,6 @@ class BarcodeScannerDialog(
                 .build()
                 .also {
                     it.setSurfaceProvider(viewFinder.surfaceProvider)
-
                 }
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
