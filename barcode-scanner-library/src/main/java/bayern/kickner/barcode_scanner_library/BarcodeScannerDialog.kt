@@ -42,7 +42,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @param torch set the flashlight mode here. Default is off.
  *
  * ToDo: Hier könnte man auch über Parameter und dem zugehörigen ML Kit einen Text einscannen. Datum automatisch erkennen! xx.xx.xxxx
+ *
+ * @deprecated Use [BarcodeScannerDialogV2] instead. Continuous scanning is currently only here available.
  */
+@Deprecated("Use v2 instead")
 class BarcodeScannerDialog(
     private val activity: ComponentActivity,
     private val options: BarcodeScannerOptions = BarcodeScannerOptions.Builder()
@@ -115,9 +118,9 @@ class BarcodeScannerDialog(
         if (buttonSettings == null) return
 
         val imgBtn = rootView.findViewById<ImageButton>(R.id.fab)
-        imgBtn.setImageDrawable(buttonSettings.fabIcon)
+        imgBtn.setImageDrawable(buttonSettings.btnIcon)
         imgBtn.setOnClickListener {
-            buttonSettings.onClick(dialog)
+            buttonSettings.onClick()
         }
         imgBtn.visibility = View.VISIBLE
 

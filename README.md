@@ -4,11 +4,12 @@ This is a simple Barcode/QR-Code Reader inside an AlertDialog. Based on the Goog
 
 Create an instance of the BarcodeScannerDialog and receive fast barcode recognition.
 
-BarcodeScannerDialog(this) {
-            Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
+    BarcodeScannerDialogV2(this@Activity) { barcode ->
+            Toast.makeText(this@Activity, barcode, Toast.LENGTH_SHORT).show()
         }
 
-Small, Simple and easy to use.
+Small, Simple and easy to use. You can set up a custom button and also use the phones flashlight.
+See the code documentation for more information.
 
 To add this library:
 
@@ -19,6 +20,6 @@ maven("https://jitpack.io")
 }
 
 build.gradle app:
-implementation("com.github.nexus421:BarcodeScanner:1.2.0")
+implementation("com.github.nexus421:BarcodeScanner:1.3.0")
 
 ![Screenshot_20220818_203455](https://user-images.githubusercontent.com/24206344/185469083-daf0ee08-7f3a-4119-8a2d-afb80c396c36.png)
