@@ -22,4 +22,6 @@ maven("https://jitpack.io")
 build.gradle app:
 implementation("com.github.nexus421:BarcodeScanner:2.0.0")
 
-![Screenshot_20220818_203455](https://user-images.githubusercontent.com/24206344/185469083-daf0ee08-7f3a-4119-8a2d-afb80c396c36.png)
+Example:
+
+![example_barcodescanner](https://github.com/nexus421/BarcodeScanner/assets/24206344/6bf903e4-7383-45e0-bf70-0f4e49882eaf)
