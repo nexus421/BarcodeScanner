@@ -47,6 +47,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         android:contentDescription="Do smth"
+        android:background="@drawable/rounded_button_scanner_v2"
         android:visibility="invisible" />
 
     <ImageButton
@@ -58,7 +59,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:contentDescription="Torch"
         android:visibility="invisible"
-        android:background="#4B000000"
-        android:src="@drawable/flashlight_on_24" />
+        android:background="@drawable/rounded_button_scanner_v2"
+        android:src="@drawable/flashlight_off_24" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

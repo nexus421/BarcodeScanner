@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
  *
  * @param activity used to display this dialog
  * @param barcodeFormats Use [Barcode] for barcodes to search for. Defaults to [Barcode.FORMAT_ALL_FORMATS]
- * @param title Displays a title at the top. If null, this won't be visible
+ * @param titleLayout Displays a title at the top. If null, this won't be visible. Custom settings through [TitleLayout]
  * @param cancelable default to true. If false, the user can't dismiss this button without a successful scan
  * @param torch choose the settings through [Torch] defaults to [Torch.Manual]
  * @param additionalButton if not null, a button will be displayed on the bottom left, based on this settings
@@ -46,7 +46,7 @@ import kotlinx.coroutines.withContext
 data class BarcodeScannerDialogV2(
     private val activity: ComponentActivity,
     private val barcodeFormats: List<Int> = listOf(Barcode.FORMAT_ALL_FORMATS),
-    private val title: String? = "Barcode scannen",
+    private val titleLayout: TitleLayout? = TitleLayout(),
     private val cancelable: Boolean = true,
     private val torch: Torch = Torch.Manual,
     private val additionalButton: ButtonSettings? = null,
@@ -56,16 +56,26 @@ data class BarcodeScannerDialogV2(
 
     private val dialog: AlertDialog
     private val rootLayout = (View.inflate(activity, R.layout.camera_dialog_layout_2, null) as ConstraintLayout).apply {
-        if (title == null) findViewById<CardView>(R.id.headline).visibility = View.GONE
-        else findViewById<TextView>(R.id.tvHeadline).text = title
-    }
-    private val viewFinder = rootLayout.findViewById<PreviewView>(R.id.viewFinder)
-    private val btn = rootLayout.findViewById<ImageButton>(R.id.btn).apply {
-        if (additionalButton != null) {
-            this.setImageDrawable(additionalButton.btnIcon)
-            setOnClickListener { additionalButton.onClick() }
+        if (titleLayout == null) findViewById<CardView>(R.id.headline).visibility = View.GONE
+        else {
+            val cardView = findViewById<CardView>(R.id.headline)
+            val tv = findViewById<TextView>(R.id.tvHeadline)
+            tv.text = titleLayout.title
+
+            //Call function if not null to customize the views.
+            titleLayout.customLayoutSettings?.let {
+                it(cardView, tv)
+            }
+        }
+
+        findViewById<ImageButton>(R.id.btn).apply {
+            if (additionalButton != null) {
+                this.setImageDrawable(additionalButton.btnIcon)
+                setOnClickListener { additionalButton.onClick() }
+            }
         }
     }
+    private val viewFinder = rootLayout.findViewById<PreviewView>(R.id.viewFinder)
     private val btnTorch = rootLayout.findViewById<ImageButton>(R.id.btnTorch)
 
     private val options = BarcodeScannerOptions.Builder()
@@ -77,6 +87,9 @@ data class BarcodeScannerDialogV2(
     private var search = true
     private val timeToWaitAfterScan = 100L
 
+
+    @Volatile
+    private var isTorchOn = false
 
     init {
         dialog = if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PERMISSION_GRANTED) {
@@ -90,7 +103,7 @@ data class BarcodeScannerDialogV2(
                 .setCancelable(cancelable)
                 .setOnDismissListener {
                     search = false
-                    camera.setTorch(false)
+                    camera.setTorch(false, btnTorch)
                 }.create()
         }
 
@@ -120,7 +133,7 @@ data class BarcodeScannerDialogV2(
                 null
             } ?: return@addListener
 
-            if (torch == Torch.ForceOn) camera.setTorch(true)
+            if (torch == Torch.ForceOn) camera.setTorch(true, btnTorch)
 
             activity.lifecycleScope.launch(Dispatchers.IO) {
                 while (search) {
@@ -142,22 +155,16 @@ data class BarcodeScannerDialogV2(
         }, ContextCompat.getMainExecutor(activity))
     }
 
-    private var isTorchOn = false
-
     private fun prepareTorch() {
         if (torch == Torch.Manual) {
             btnTorch.apply {
                 visibility = View.VISIBLE
                 setOnClickListener {
                     isTorchOn = isTorchOn.not()
-                    camera.setTorch(isTorchOn)
+                    camera.setTorch(isTorchOn, btnTorch)
                 }
             }
         }
-    }
-
-    private fun prepareAdditionalButton() {
-
     }
 
     private fun scanBarcode(bitmap: Bitmap, result: (String) -> Unit) {
@@ -185,9 +192,15 @@ data class BarcodeScannerDialogV2(
 
 }
 
-private fun Camera.setTorch(on: Boolean) {
+private fun Camera.setTorch(on: Boolean, imgBtn: ImageButton) {
     try {
         cameraControl.enableTorch(on)
+        imgBtn.setImageDrawable(
+            ContextCompat.getDrawable(
+                imgBtn.context,
+                if (on) R.drawable.flashlight_on_24 else R.drawable.flashlight_off_24
+            )
+        )
     } catch (e: Exception) {
         Log.e("Torch", "Error turning on torch")
     }
