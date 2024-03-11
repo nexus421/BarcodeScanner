@@ -1,7 +1,11 @@
 package bayern.kickner.barcode_scanner_library
 
 import android.Manifest
+import android.content.Context
 import android.graphics.Bitmap
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Log
 import android.view.View
 import android.widget.ImageButton
@@ -39,20 +43,21 @@ import kotlinx.coroutines.withContext
  * @param cancelable default to true. If false, the user can't dismiss this button without a successful scan
  * @param torch choose the settings through [Torch] defaults to [Torch.Manual]
  * @param additionalButton if not null, a button will be displayed on the bottom left, based on this settings
+ * @param vibrateOnScanned if true, the device will vibrate for 200ms on an scan result
  * @param onError any error or failed barcode scan will be send to this callback. Defaults to log through [Log.e]
- * @param onResult the found barcode will be send to this callback as a simple string
+ * @param onResult the found barcode will be send to this callback as a simple string. As long as you return false, the dialog will not be closed. Hint: you may delay the returning.
  *
- * User [BarcodeScannerContinuousDialog] if you ned continuous scanning!
  */
-data class BarcodeScannerDialogV2(
+data class BarcodeScannerContinuousDialog(
     private val activity: ComponentActivity,
     private val barcodeFormats: List<Int> = listOf(Barcode.FORMAT_ALL_FORMATS),
     private val titleLayout: TitleLayout? = TitleLayout(),
     private val cancelable: Boolean = true,
     private val torch: Torch = Torch.Manual,
     private val additionalButton: ButtonSettings? = null,
+    private val vibrateOnScanned: Boolean = true,
     private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t -> Log.e("BarcodeScannerDialogV2", s, t) },
-    private val onResult: (barcode: String) -> Unit
+    private val onResult: (barcode: String) -> Boolean
 ) {
 
     private val dialog: AlertDialog
@@ -145,8 +150,13 @@ data class BarcodeScannerDialogV2(
                         scanBarcode(image) { scannedBarcode ->
                             if (scannedBarcode.isNotBlank() && search) {
                                 search = false
-                                onResult(scannedBarcode)
-                                dialog.dismiss()
+                                if (vibrateOnScanned) {
+                                    val vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                                    if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
+                                    else vibrator.vibrate(200)
+                                }
+                                if (onResult(scannedBarcode)) return@scanBarcode dialog.dismiss()
+                                search = true
                             }
                         }
                     }
