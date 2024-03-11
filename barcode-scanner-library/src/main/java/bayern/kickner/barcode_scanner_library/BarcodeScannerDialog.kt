@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * ToDo: Hier könnte man auch über Parameter und dem zugehörigen ML Kit einen Text einscannen. Datum automatisch erkennen! xx.xx.xxxx
  *
- * @deprecated Use [BarcodeScannerDialogV2] instead. Continuous scanning is currently only here available.
+ * @deprecated Use [BarcodeScannerDialogV2] instead. Continuous scanning is available through [BarcodeScannerContinuousDialog]
  */
 @Deprecated("Use v2 instead")
 class BarcodeScannerDialog(
