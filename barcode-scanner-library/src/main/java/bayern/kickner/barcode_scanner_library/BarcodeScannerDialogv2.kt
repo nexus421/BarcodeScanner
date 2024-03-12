@@ -42,7 +42,8 @@ import kotlinx.coroutines.withContext
  * @param onError any error or failed barcode scan will be send to this callback. Defaults to log through [Log.e]
  * @param onResult the found barcode will be send to this callback as a simple string
  *
- * User [BarcodeScannerContinuousDialog] if you ned continuous scanning!
+ * Use [BarcodeScannerContinuousDialog] if you ned continuous scanning!
+ * Everything here can also be done with [BarcodeScannerContinuousDialog]. You may only use that one.
  */
 data class BarcodeScannerDialogV2(
     private val activity: ComponentActivity,

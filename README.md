@@ -8,6 +8,11 @@ Create an instance of the BarcodeScannerDialog and receive fast barcode recognit
             Toast.makeText(this@Activity, barcode, Toast.LENGTH_SHORT).show()
         }
 
+    BarcodeScannerContinuousDialog(this@Activity) { barcode ->
+        Toast.makeText(this@Activity, barcode, Toast.LENGTH_SHORT).show()
+        false
+    }
+
 Small, Simple and easy to use. You can set up a custom button and also use the phones flashlight.
 See the code documentation for more information.
 
@@ -20,7 +25,7 @@ maven("https://jitpack.io")
 }
 
 build.gradle app:
-implementation("com.github.nexus421:BarcodeScanner:2.0.1")
+implementation("com.github.nexus421:BarcodeScanner:2.1.0")
 
 Example:
 

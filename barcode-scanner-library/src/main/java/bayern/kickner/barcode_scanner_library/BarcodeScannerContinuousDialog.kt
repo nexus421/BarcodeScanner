@@ -47,6 +47,7 @@ import kotlinx.coroutines.withContext
  * @param onError any error or failed barcode scan will be send to this callback. Defaults to log through [Log.e]
  * @param onResult the found barcode will be send to this callback as a simple string. As long as you return false, the dialog will not be closed. Hint: you may delay the returning.
  *
+ * Hint: If you want a single recognition like [BarcodeScannerDialogV2] return true after the first result within [onResult]
  */
 data class BarcodeScannerContinuousDialog(
     private val activity: ComponentActivity,
@@ -56,7 +57,13 @@ data class BarcodeScannerContinuousDialog(
     private val torch: Torch = Torch.Manual,
     private val additionalButton: ButtonSettings? = null,
     private val vibrateOnScanned: Boolean = true,
-    private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t -> Log.e("BarcodeScannerDialogV2", s, t) },
+    private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t ->
+        Log.e(
+            "BarcodeScannerContinuousDialog",
+            s,
+            t
+        )
+    },
     private val onResult: (barcode: String) -> Boolean
 ) {
 
@@ -93,6 +100,7 @@ data class BarcodeScannerContinuousDialog(
     private var search = true
     private val timeToWaitAfterScan = 100L
 
+    private val vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
     @Volatile
     private var isTorchOn = false
@@ -125,7 +133,6 @@ data class BarcodeScannerContinuousDialog(
                 .build()
                 .apply {
                     setSurfaceProvider(viewFinder.surfaceProvider)
-
                 }
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -151,7 +158,6 @@ data class BarcodeScannerContinuousDialog(
                             if (scannedBarcode.isNotBlank() && search) {
                                 search = false
                                 if (vibrateOnScanned) {
-                                    val vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
                                     if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
                                     else vibrator.vibrate(200)
                                 }
