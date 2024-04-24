@@ -146,6 +146,7 @@ data class BarcodeScannerDialogV2(
                         scanBarcode(image) { scannedBarcode ->
                             if (scannedBarcode.isNotBlank() && search) {
                                 search = false
+                                camera.setTorch(false, btnTorch)
                                 onResult(scannedBarcode)
                                 dialog.dismiss()
                             }

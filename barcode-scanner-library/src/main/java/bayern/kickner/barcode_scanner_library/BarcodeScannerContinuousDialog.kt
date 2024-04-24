@@ -161,7 +161,10 @@ data class BarcodeScannerContinuousDialog(
                                     if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
                                     else vibrator.vibrate(200)
                                 }
-                                if (onResult(scannedBarcode)) return@scanBarcode dialog.dismiss()
+                                if (onResult(scannedBarcode)) {
+                                    camera.setTorch(false, btnTorch)
+                                    return@scanBarcode dialog.dismiss()
+                                }
                                 search = true
                             }
                         }
