@@ -25,7 +25,7 @@ maven("https://jitpack.io")
 }
 
 build.gradle app:
-implementation("com.github.nexus421:BarcodeScanner:2.0.2")
+implementation("com.github.nexus421:BarcodeScanner:2.1.1")
 
 Example:
 
