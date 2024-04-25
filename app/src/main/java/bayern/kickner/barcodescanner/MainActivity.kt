@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import bayern.kickner.barcode_scanner_library.BarcodeScannerContinuousDialog
+import bayern.kickner.barcode_scanner_library.BarcodeScannerDialogV2
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btn1).setOnClickListener {
-            BarcodeScannerContinuousDialog(this) {
+            BarcodeScannerDialogV2(this) {
                 runOnUiThread {
                     Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
                 }

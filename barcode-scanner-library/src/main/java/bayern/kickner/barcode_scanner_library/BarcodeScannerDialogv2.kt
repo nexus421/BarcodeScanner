@@ -93,6 +93,8 @@ data class BarcodeScannerDialogV2(
     @Volatile
     private var isTorchOn = false
 
+    private lateinit var cameraProvider: ProcessCameraProvider
+
     init {
         dialog = if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) != PERMISSION_GRANTED) {
             onError("Camera permission is missing.", null)
@@ -109,6 +111,16 @@ data class BarcodeScannerDialogV2(
                 }.create()
         }
 
+        dialog.setOnDismissListener {
+            try {
+                search = false
+                //Aufräumen und Kamera wieder freigeben.
+                cameraProvider.unbindAll()
+            } catch (e: Exception) {
+                onError("", e)
+            }
+        }
+
         dialog.show()
     }
 
@@ -116,12 +128,11 @@ data class BarcodeScannerDialogV2(
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
 
         cameraProviderFuture.addListener({
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            cameraProvider = cameraProviderFuture.get()
             val preview = Preview.Builder()
                 .build()
                 .apply {
                     setSurfaceProvider(viewFinder.surfaceProvider)
-
                 }
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -129,7 +140,6 @@ data class BarcodeScannerDialogV2(
             camera = try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(activity, cameraSelector, preview)
-
             } catch (exc: Exception) {
                 onError("Use case binding failed", exc)
                 null
@@ -146,7 +156,6 @@ data class BarcodeScannerDialogV2(
                         scanBarcode(image) { scannedBarcode ->
                             if (scannedBarcode.isNotBlank() && search) {
                                 search = false
-                                camera.setTorch(false, btnTorch)
                                 onResult(scannedBarcode)
                                 dialog.dismiss()
                             }

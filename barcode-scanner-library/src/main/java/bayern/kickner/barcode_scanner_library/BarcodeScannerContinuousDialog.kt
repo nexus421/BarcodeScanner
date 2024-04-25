@@ -121,14 +121,26 @@ data class BarcodeScannerContinuousDialog(
                 }.create()
         }
 
+        dialog.setOnDismissListener {
+            try {
+                search = false
+                //Aufräumen und Kamera wieder freigeben.
+                cameraProvider.unbindAll()
+            } catch (e: Exception) {
+                onError("", e)
+            }
+        }
+
         dialog.show()
     }
+
+    private lateinit var cameraProvider: ProcessCameraProvider
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
 
         cameraProviderFuture.addListener({
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            cameraProvider = cameraProviderFuture.get()
             val preview = Preview.Builder()
                 .build()
                 .apply {
@@ -140,7 +152,6 @@ data class BarcodeScannerContinuousDialog(
             camera = try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(activity, cameraSelector, preview)
-
             } catch (exc: Exception) {
                 onError("Use case binding failed", exc)
                 null
@@ -162,7 +173,6 @@ data class BarcodeScannerContinuousDialog(
                                     else vibrator.vibrate(200)
                                 }
                                 if (onResult(scannedBarcode)) {
-                                    camera.setTorch(false, btnTorch)
                                     return@scanBarcode dialog.dismiss()
                                 }
                                 search = true
