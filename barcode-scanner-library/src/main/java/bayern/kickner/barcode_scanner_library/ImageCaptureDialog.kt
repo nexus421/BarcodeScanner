@@ -17,7 +17,6 @@ import androidx.cardview.widget.CardView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
-import java.io.ByteArrayOutputStream
 
 /**
  * Simple Dialog to Display the current view form the back main camera. Simply click the camera button to take a picture.
@@ -88,8 +87,6 @@ class ImageCaptureDialog<T>(
         }
 
         btnTakePicture.setOnClickListener {
-            val out = ByteArrayOutputStream()
-            val outputFileOptions = ImageCapture.OutputFileOptions.Builder(out).build()
             imageCapture.takePicture(
                 imageCaptureResult.outputFileOptions,
                 ContextCompat.getMainExecutor(activity),
