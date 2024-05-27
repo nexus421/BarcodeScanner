@@ -29,9 +29,9 @@ import java.io.ByteArrayOutputStream
  * @param jpegQuality set the jpeg quality. Default is 95. Higher results in better image quality.
  * @param rotation if null, the current display state will be used. You can force an orientation state through [CameraRotation].
  * @param onError called on any error
- * @param onResult called with the captured image as ByteArray. Return true to dismiss the dialog. Otherwise the Dialog will not be dismissed.
+ * @param imageCaptureResult select the desired result to receive the image.
  */
-class ImageCaptureDialog(
+class ImageCaptureDialog<T>(
     private val activity: ComponentActivity,
     private val titleLayout: TitleLayout? = null,
     cancelable: Boolean = true,
@@ -40,7 +40,7 @@ class ImageCaptureDialog(
     @androidx.annotation.IntRange(from = 1L, to = 100L) private val jpegQuality: Int = 95,
     rotation: CameraRotation? = null,
     private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t -> Log.e("ImageCaptureDialog", s, t) },
-    private val onResult: (capturedImage: ByteArray) -> Boolean
+    private val imageCaptureResult: ImageCaptureResult<T>
 ) {
 
     private val dialog: AlertDialog
@@ -90,9 +90,17 @@ class ImageCaptureDialog(
         btnTakePicture.setOnClickListener {
             val out = ByteArrayOutputStream()
             val outputFileOptions = ImageCapture.OutputFileOptions.Builder(out).build()
-            imageCapture.takePicture(outputFileOptions, ContextCompat.getMainExecutor(activity), object : ImageCapture.OnImageSavedCallback {
+            imageCapture.takePicture(
+                imageCaptureResult.outputFileOptions,
+                ContextCompat.getMainExecutor(activity),
+                object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    if (onResult(out.use { it.toByteArray() })) dialog.dismiss()
+                    val dismiss = when (imageCaptureResult) {
+                        is ImageCaptureResult.ByteArray -> imageCaptureResult.onResult(imageCaptureResult.readStreamAndClose())
+                        is ImageCaptureResult.File -> imageCaptureResult.onResult(imageCaptureResult.destinationFile)
+                        is ImageCaptureResult.Uri -> imageCaptureResult.onResult(outputFileResults.savedUri!!)
+                    }
+                    if (dismiss) dialog.dismiss()
                 }
 
                 override fun onError(exception: ImageCaptureException) {

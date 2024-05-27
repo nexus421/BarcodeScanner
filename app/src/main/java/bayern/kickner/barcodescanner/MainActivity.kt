@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import bayern.kickner.barcode_scanner_library.BarcodeScannerDialogV2
 import bayern.kickner.barcode_scanner_library.ImageCaptureDialog
+import bayern.kickner.barcode_scanner_library.ImageCaptureResult
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -29,12 +30,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btn3).setOnClickListener {
-            ImageCaptureDialog(this) {
-                File(filesDir, "test.jpg").writeBytes(it)
-                val bitmap = BitmapFactory.decodeStream(it.inputStream())
+            ImageCaptureDialog(this, imageCaptureResult = ImageCaptureResult.File(File(filesDir, "fillleeee.jpg")) {
+                val bitmap = BitmapFactory.decodeFile(it.absolutePath)
                 findViewById<ImageView>(R.id.image).setImageBitmap(bitmap)
                 true
-            }
+            })
         }
 
 
