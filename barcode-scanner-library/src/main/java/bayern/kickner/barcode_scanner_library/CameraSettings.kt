@@ -18,7 +18,10 @@ enum class CaptureMode(val type: Int) {
 
 enum class CameraRotation(val type: Int) {
     Rotate0(Surface.ROTATION_0), Rotate90(Surface.ROTATION_90), Rotate180(Surface.ROTATION_180), Rotate270(Surface.ROTATION_270)
+}
 
+enum class State {
+    StartTakingPicture, EndTakingPicture
 }
 
 sealed class ImageCaptureResult<T>(val outputFileOptions: ImageCapture.OutputFileOptions, val onResult: (T) -> Boolean) {

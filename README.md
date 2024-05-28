@@ -16,6 +16,8 @@ Create an instance of the BarcodeScannerDialog and receive fast barcode recognit
 Small, Simple and easy to use. You can set up a custom button and also use the phones flashlight.
 See the code documentation for more information.
 
+New: Simple dialog to easily take pictures!
+
 To add this library:
 
 build.gradle (top-level) or settings.gradle:
@@ -25,7 +27,7 @@ maven("https://jitpack.io")
 }
 
 build.gradle app:
-implementation("com.github.nexus421:BarcodeScanner:2.1.2")
+implementation("com.github.nexus421:BarcodeScanner:2.2.0")
 
 Example:
 

@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
  * @param torch choose the settings through [Torch] defaults to [Torch.Manual]
  * @param additionalButton if not null, a button will be displayed on the bottom left, based on this settings
  * @param onError any error or failed barcode scan will be send to this callback. Defaults to log through [Log.e]
+ * @param onDismiss will be called after everything was cleaned up and the dialog will be dismissed finally
  * @param onResult the found barcode will be send to this callback as a simple string
  *
  * Use [BarcodeScannerContinuousDialog] if you ned continuous scanning!
@@ -53,6 +54,7 @@ data class BarcodeScannerDialogV2(
     private val torch: Torch = Torch.Manual,
     private val additionalButton: ButtonSettings? = null,
     private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t -> Log.e("BarcodeScannerDialogV2", s, t) },
+    private val onDismiss: (() -> Unit)? = null,
     private val onResult: (barcode: String) -> Unit
 ) {
 
@@ -105,19 +107,19 @@ data class BarcodeScannerDialogV2(
             AlertDialog.Builder(activity)
                 .setView(rootLayout)
                 .setCancelable(cancelable)
-                .setOnDismissListener {
-                    search = false
-                    camera.setTorch(false, btnTorch)
-                }.create()
+                .create()
         }
 
         dialog.setOnDismissListener {
             try {
                 search = false
+                camera.setTorch(false, btnTorch)
                 //Aufräumen und Kamera wieder freigeben.
                 cameraProvider.unbindAll()
             } catch (e: Exception) {
                 onError("", e)
+            } finally {
+                onDismiss?.invoke()
             }
         }
 
