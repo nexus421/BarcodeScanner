@@ -53,6 +53,7 @@ data class BarcodeScannerDialogV2(
     private val torch: Torch = Torch.Manual,
     private val additionalButton: ButtonSettings? = null,
     private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t -> Log.e("BarcodeScannerDialogV2", s, t) },
+    private val onDismiss: (() -> Unit)? = null,
     private val onResult: (barcode: String) -> Unit
 ) {
 
@@ -106,19 +107,15 @@ data class BarcodeScannerDialogV2(
                 .setView(rootLayout)
                 .setCancelable(cancelable)
                 .setOnDismissListener {
-                    search = false
-                    camera.setTorch(false, btnTorch)
+                    try {
+                        search = false
+                        camera.setTorch(false, btnTorch)
+                    } catch (e: Exception) {
+                        onError("", e)
+                    } finally {
+                        onDismiss?.let { it() }
+                    }
                 }.create()
-        }
-
-        dialog.setOnDismissListener {
-            try {
-                search = false
-                //Aufräumen und Kamera wieder freigeben.
-                cameraProvider.unbindAll()
-            } catch (e: Exception) {
-                onError("", e)
-            }
         }
 
         dialog.show()

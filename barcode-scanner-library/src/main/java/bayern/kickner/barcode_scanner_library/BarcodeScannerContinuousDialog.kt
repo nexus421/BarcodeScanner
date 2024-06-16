@@ -57,13 +57,8 @@ data class BarcodeScannerContinuousDialog(
     private val torch: Torch = Torch.Manual,
     private val additionalButton: ButtonSettings? = null,
     private val vibrateOnScanned: Boolean = true,
-    private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t ->
-        Log.e(
-            "BarcodeScannerContinuousDialog",
-            s,
-            t
-        )
-    },
+    private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t -> Log.e("BarcodeScannerContinuousDialog", s, t) },
+    private val onDismiss: (() -> Unit)? = null,
     private val onResult: (barcode: String) -> Boolean
 ) {
 
@@ -116,19 +111,15 @@ data class BarcodeScannerContinuousDialog(
                 .setView(rootLayout)
                 .setCancelable(cancelable)
                 .setOnDismissListener {
-                    search = false
-                    camera.setTorch(false, btnTorch)
+                    try {
+                        search = false
+                        camera.setTorch(false, btnTorch)
+                    } catch (e: Exception) {
+                        onError("", e)
+                    } finally {
+                        onDismiss?.let { it() }
+                    }
                 }.create()
-        }
-
-        dialog.setOnDismissListener {
-            try {
-                search = false
-                //Aufräumen und Kamera wieder freigeben.
-                cameraProvider.unbindAll()
-            } catch (e: Exception) {
-                onError("", e)
-            }
         }
 
         dialog.show()

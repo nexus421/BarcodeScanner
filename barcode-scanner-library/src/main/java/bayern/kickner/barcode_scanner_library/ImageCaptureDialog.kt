@@ -39,6 +39,7 @@ class ImageCaptureDialog<T>(
     @androidx.annotation.IntRange(from = 1L, to = 100L) private val jpegQuality: Int = 95,
     rotation: CameraRotation? = null,
     private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t -> Log.e("ImageCaptureDialog", s, t) },
+    private val onDismiss: (() -> Unit)? = null,
     private val imageCaptureResult: ImageCaptureResult<T>
 ) {
 
@@ -113,6 +114,8 @@ class ImageCaptureDialog<T>(
                 cameraProvider.unbindAll()
             } catch (e: Exception) {
                 onError("", e)
+            } finally {
+                onDismiss?.invoke()
             }
         }
 
