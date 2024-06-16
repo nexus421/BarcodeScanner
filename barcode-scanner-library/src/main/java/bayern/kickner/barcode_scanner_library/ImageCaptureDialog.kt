@@ -28,6 +28,7 @@ import androidx.core.content.PermissionChecker
  * @param jpegQuality set the jpeg quality. Default is 95. Higher results in better image quality.
  * @param rotation if null, the current display state will be used. You can force an orientation state through [CameraRotation].
  * @param onError called on any error
+ * @param onTakingImage Will be called before anything happened and after the capture finished (successful or not). You may use this to show an loading animation.
  * @param imageCaptureResult select the desired result to receive the image.
  */
 class ImageCaptureDialog<T>(
@@ -39,7 +40,7 @@ class ImageCaptureDialog<T>(
     @androidx.annotation.IntRange(from = 1L, to = 100L) private val jpegQuality: Int = 95,
     rotation: CameraRotation? = null,
     private val onError: ((msg: String, t: Throwable?) -> Unit) = { s, t -> Log.e("ImageCaptureDialog", s, t) },
-    private val onDismiss: (() -> Unit)? = null,
+    private val onTakingImage: ((State) -> Unit)? = null,
     private val imageCaptureResult: ImageCaptureResult<T>
 ) {
 
@@ -88,6 +89,7 @@ class ImageCaptureDialog<T>(
         }
 
         btnTakePicture.setOnClickListener {
+            onTakingImage?.invoke(State.StartTakingPicture)
             imageCapture.takePicture(
                 imageCaptureResult.outputFileOptions,
                 ContextCompat.getMainExecutor(activity),
@@ -99,10 +101,12 @@ class ImageCaptureDialog<T>(
                         is ImageCaptureResult.Uri -> imageCaptureResult.onResult(outputFileResults.savedUri!!)
                     }
                     if (dismiss) dialog.dismiss()
+                    onTakingImage?.invoke(State.EndTakingPicture)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     onError("Error capturing image", exception)
+                    onTakingImage?.invoke(State.EndTakingPicture)
                 }
 
             })
@@ -114,8 +118,6 @@ class ImageCaptureDialog<T>(
                 cameraProvider.unbindAll()
             } catch (e: Exception) {
                 onError("", e)
-            } finally {
-                onDismiss?.invoke()
             }
         }
 
