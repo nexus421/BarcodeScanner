@@ -34,7 +34,7 @@ repositories {
 ```gradle
 // build.gradle (app)
 dependencies {
-    implementation "com.github.nexus421:BarcodeScanner:2.2.0"
+    implementation "com.github.nexus421:BarcodeScanner:2.2.1"
 }
 ```
 
