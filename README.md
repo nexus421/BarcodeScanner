@@ -1,10 +1,9 @@
 # BarcodeScanner
 
-[![](https://jitpack.io/v/nexus421/BarcodeScanner.svg)](https://jitpack.io/#nexus421/BarcodeScanner)
-
 ## Overview
 
-A simple, lightweight Barcode/QR-Code Reader inside an AlertDialog. Built with Google ML-Kit and the new CameraX API.
+A simple and lightweight Barcode/QR-Code Reader presented inside an `AlertDialog`. It's built with
+Google's ML Kit and the CameraX API.
 
 ## Features
 
@@ -17,32 +16,39 @@ A simple, lightweight Barcode/QR-Code Reader inside an AlertDialog. Built with G
 
 ## Installation
 
-### Gradle Setup
+1. **Add the repository**
 
-1. Add JitPack repository to your build file
+   Add the Maven repository to your `settings.gradle.kts`:
 
-```gradle
-// build.gradle (top-level) or settings.gradle
-repositories {
-    // ...
-    maven { url "https://jitpack.io" }
-}
-```
+   ```kotlin
+   // settings.gradle.kts
+   dependencyResolutionManagement {
+       repositories {
+           // ...
+           maven {
+               name = "nexus421Maven"
+               url = uri("https://maven.kickner.bayern/releases")
+           }
+       }
+   }
+   ```
 
-2. Add the dependency
+2. **Add the dependency**
 
-```gradle
-// build.gradle (app)
-dependencies {
-    implementation "com.github.nexus421:BarcodeScanner:2.2.1"
-}
-```
+   Add the library dependency to your app's `build.gradle.kts`:
+
+   ```kotlin
+   // app/build.gradle.kts
+   dependencies {
+       implementation("bayern.kickner:BarcodeScanner:2.2.3")
+   }
+   ```
 
 ## Usage
 
 ### Basic Scanner
 
-Create an instance of the BarcodeScannerDialog for one-time scanning:
+Create an instance of `BarcodeScannerDialogV2` for one-time scanning:
 
 ```kotlin
 BarcodeScannerDialogV2(this@Activity) { barcode ->
@@ -52,39 +58,40 @@ BarcodeScannerDialogV2(this@Activity) { barcode ->
 
 ### Continuous Scanner
 
-For continuous scanning (multiple barcodes):
+For continuous scanning (multiple barcodes), use `BarcodeScannerContinuousDialog`:
 
 ```kotlin
 BarcodeScannerContinuousDialog(this@Activity) { barcode ->
     Toast.makeText(this@Activity, barcode, Toast.LENGTH_SHORT).show()
-    // Return true to stop scanning, false to continue
+    // Return true to stop scanning, or false to continue
     false
 }
 ```
 
 ### Image Capture
 
-Simple dialog to easily take pictures:
+The `ImageCaptureDialog` provides a simple way to take pictures:
 
 ```kotlin
 ImageCaptureDialog(this@Activity) { bitmap ->
-    // Handle the captured image
+    // Handle the captured bitmap
 }
 ```
 
 ## Customization
 
-You can customize the scanner with various options:
+The dialogs can be customized with various options:
+
 - Custom buttons
 - Flashlight control
 - Camera settings
 
-See the code documentation for more detailed information.
+Please refer to the source code documentation for more details.
 
 ## License
 
 [WTFPL](https://www.wtfpl.net/)
 
-___
+---
 
-![example_barcodescanner](https://github.com/nexus421/BarcodeScanner/assets/24206344/6bf903e4-7383-45e0-bf70-0f4e49882eaf)
+![Example of the barcode scanner in action](https://github.com/nexus421/BarcodeScanner/assets/24206344/6bf903e4-7383-45e0-bf70-0f4e49882eaf)
