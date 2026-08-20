@@ -20,16 +20,26 @@ import androidx.cardview.widget.CardView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 private const val TAG = "BarcodeScannerDialogV3"
 
@@ -45,6 +55,18 @@ private const val TAG = "BarcodeScannerDialogV3"
  * detection order, unmodified - callers who need more than [Barcode.getRawValue] (e.g. [Barcode.getBoundingBox]
  * or [Barcode.getCornerPoints] to draw a marker on the image) already have everything they need on each entry.
  *
+ * The camera is a process-wide resource ([androidx.camera.lifecycle.ProcessCameraProvider] is itself a
+ * singleton), so only one [BarcodeScannerDialogV3] can actually use it at a time. Constructing a second instance
+ * while one is still showing does not steal the camera from the first one - it immediately reports through
+ * [onError] and shows a "busy" placeholder instead. This guard only protects against a second
+ * [BarcodeScannerDialogV3] - it has no effect on [BarcodeScannerDialogV2], [BarcodeScannerContinuousDialog] or
+ * [ImageCaptureDialog], which are unaware of it and can still claim the camera concurrently.
+ *
+ * This is a regular `class`, not a `data class` - constructing an instance has the side effect of immediately
+ * showing a dialog (see [init]), so an accidental `.copy()` on an already-showing instance would show a second,
+ * unwanted dialog and re-trigger [onError]/[onDismiss]. Making `.copy()`/`equals`/`hashCode` unavailable prevents
+ * that footgun outright, at the cost of deviating from this library's usual `data class` convention.
+ *
  * @param activity used to display this dialog
  * @param barcodeFormats Use [Barcode] format constants to search for. Defaults to [Barcode.FORMAT_ALL_FORMATS].
  * Duplicate values are ignored, an empty list falls back to [Barcode.FORMAT_ALL_FORMATS].
@@ -58,7 +80,7 @@ private const val TAG = "BarcodeScannerDialogV3"
  * @param onDismiss will be called after everything was cleaned up and the dialog will be dismissed finally
  * @param onResult every barcode ML Kit detected in the accepted frame, in ML Kit's own order
  */
-data class BarcodeScannerDialogV3(
+class BarcodeScannerDialogV3(
     private val activity: ComponentActivity,
     private val barcodeFormats: List<Int> = listOf(Barcode.FORMAT_ALL_FORMATS),
     private val titleLayout: TitleLayout? = TitleLayout(),
@@ -71,6 +93,13 @@ data class BarcodeScannerDialogV3(
     private val onResult: (barcodes: List<Barcode>) -> Unit
 ) {
 
+    companion object {
+        //Guards the process-wide camera resource against two instances of THIS class binding to it at the same
+        //time. AtomicBoolean.compareAndSet is used instead of a plain @Volatile read-then-write, so claiming the
+        //guard is a single atomic operation instead of two separate steps that could race.
+        private val isAnyInstanceActive = AtomicBoolean(false)
+    }
+
     private val dialog: AlertDialog
     private val rootLayout = (View.inflate(activity, R.layout.camera_dialog_layout_3, null) as ConstraintLayout).apply {
         if (titleLayout == null) findViewById<CardView>(R.id.headline).visibility = View.GONE
@@ -81,12 +110,17 @@ data class BarcodeScannerDialogV3(
 
             //Call function if not null to customize the views.
             titleLayout.customLayoutSettings?.let {
-                it(cardView, tv)
+                try {
+                    it(cardView, tv)
+                } catch (e: Exception) {
+                    onError("customLayoutSettings threw", e)
+                }
             }
         }
 
         findViewById<ImageButton>(R.id.btn).apply {
             if (additionalButton != null) {
+                visibility = View.VISIBLE
                 this.setImageDrawable(additionalButton.btnIcon)
                 setOnClickListener { additionalButton.onClick() }
             }
@@ -100,8 +134,10 @@ data class BarcodeScannerDialogV3(
         BarcodeScannerOptions.Builder().setBarcodeFormats(formats[0], *formats.drop(1).toIntArray()).build()
     }
 
-    //Created lazily so a denied camera permission never allocates an ML Kit scanner client.
-    private val scanner by lazy(LazyThreadSafetyMode.NONE) { BarcodeScanning.getClient(options) }
+    //Created lazily so a denied camera permission never allocates an ML Kit scanner client. Uses the default
+    //SYNCHRONIZED thread-safety mode since this can be first accessed either from the IO scan loop or from the
+    //main-thread dismiss/cleanup path.
+    private val scanner by lazy { BarcodeScanning.getClient(options) }
 
     private lateinit var camera: Camera
     private lateinit var cameraProvider: ProcessCameraProvider
@@ -119,39 +155,66 @@ data class BarcodeScannerDialogV3(
 
     private val permissionGranted = ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PERMISSION_GRANTED
 
+    //Atomically claims the flag for itself (if it's free) instead of a separate read now / write later, which
+    //could otherwise let two near-simultaneous instances both see the guard as free.
+    private val showingCameraPreview = permissionGranted && isAnyInstanceActive.compareAndSet(false, true)
+
     init {
-        dialog = if (!permissionGranted) {
-            onError("Camera permission is missing.", null)
-            AlertDialog.Builder(activity).setTitle("Permission").setMessage("Camera permission is missing!").create()
-        } else {
-            startCamera()
-            prepareTorch()
-            AlertDialog.Builder(activity)
-                .setView(rootLayout)
-                .setCancelable(cancelable)
-                .create()
+        dialog = when {
+            permissionGranted.not() -> {
+                onError("Camera permission is missing.", null)
+                AlertDialog.Builder(activity).setTitle("Permission").setMessage("Camera permission is missing!").create()
+            }
+
+            showingCameraPreview.not() -> {
+                onError("Another BarcodeScannerDialogV3 is already active - only one scanner can use the camera at a time.", null)
+                AlertDialog.Builder(activity).setTitle("Scanner busy").setMessage("Another barcode scanner is already open.").create()
+            }
+
+            else -> {
+                startCamera()
+                AlertDialog.Builder(activity)
+                    .setView(rootLayout)
+                    .setCancelable(cancelable)
+                    .create()
+            }
         }
 
         dialog.setOnDismissListener {
-            //Only the camera path allocated a camera/cameraProvider/scanner - skip cleanup entirely on the permission-denied path.
-            if (cameraInitialized) {
-                try {
+            try {
+                //Only the camera path allocated a camera/cameraProvider/scanner - skip cleanup entirely on the permission-denied/busy paths.
+                if (cameraInitialized) {
                     search = false
                     scanJob?.cancel()
-                    camera.setTorch(false, btnTorch)
-                    cameraProvider.unbindAll()
-                    scanner.close()
-                } catch (e: Exception) {
-                    onError("Error while cleaning up the barcode scanner", e)
                 }
+            } catch (e: Exception) {
+                onError("Error while cleaning up the barcode scanner", e)
+            } finally {
+                //Release the guard whenever this instance claimed it, regardless of whether binding the camera actually
+                //succeeded. Runs in `finally` so a throwing cleanup above - or a throwing onError - can never leave the
+                //flag stuck on true.
+                if (showingCameraPreview) isAnyInstanceActive.set(false)
+                onDismiss?.invoke()
             }
-            onDismiss?.invoke()
+        }
+
+        if (showingCameraPreview) {
+            //Backstop in case setOnDismissListener never fires at all (e.g. the Activity gets destroyed/leaked
+            //without properly dismissing the dialog first) - without this the guard could stay claimed forever.
+            activity.lifecycle.addObserver(object : LifecycleEventObserver {
+                override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+                    if (event == Lifecycle.Event.ON_DESTROY) {
+                        isAnyInstanceActive.set(false)
+                        source.lifecycle.removeObserver(this)
+                    }
+                }
+            })
         }
 
         dialog.show()
 
         //The window size can only be applied reliably after show() - and only makes sense for the actual camera dialog.
-        if (permissionGranted) applyDialogSize(dialogSize)
+        if (showingCameraPreview) applyDialogSize(dialogSize)
     }
 
     private fun applyDialogSize(size: DialogSize) {
@@ -160,8 +223,12 @@ data class BarcodeScannerDialogV3(
             //Removes the dialog theme's rounded background/margins so the preview reaches every edge.
             window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
         }
-        val metrics = activity.resources.displayMetrics
-        val (width, height) = resolveWindowSize(size, metrics.widthPixels, metrics.heightPixels)
+        //Uses the Activity's actual window/decor size instead of the raw display metrics, since the latter can be
+        //larger than what's actually available to the Activity in split-screen/multi-window/foldable setups.
+        val decorView = activity.window.decorView
+        val screenWidth = decorView.width.takeIf { it > 0 } ?: activity.resources.displayMetrics.widthPixels
+        val screenHeight = decorView.height.takeIf { it > 0 } ?: activity.resources.displayMetrics.heightPixels
+        val (width, height) = resolveWindowSize(size, screenWidth, screenHeight)
         window.setLayout(width, height)
     }
 
@@ -169,7 +236,21 @@ data class BarcodeScannerDialogV3(
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
 
         cameraProviderFuture.addListener({
-            cameraProvider = cameraProviderFuture.get()
+            //The dialog may already have been dismissed while the provider was still loading (e.g. a fast
+            //back-tap) - don't bind a zombie camera that nothing will ever clean up again.
+            if (!dialog.isShowing) return@addListener
+
+            cameraProvider = try {
+                cameraProviderFuture.get()
+            } catch (exc: Exception) {
+                onError("Failed to obtain the camera provider", exc)
+                //A permanent provider failure means a successful scan can never happen anymore - the
+                //cancelable = false "no way out except a successful scan" promise only makes sense for that case,
+                //not for a technical defect, so close the dialog instead of leaving the user stuck.
+                dialog.dismiss()
+                return@addListener
+            }
+
             val preview = Preview.Builder()
                 .build()
                 .apply {
@@ -184,26 +265,58 @@ data class BarcodeScannerDialogV3(
             } catch (exc: Exception) {
                 onError("Use case binding failed", exc)
                 null
-            } ?: return@addListener
+            } ?: run {
+                dialog.dismiss()
+                return@addListener
+            }
+
+            if (!dialog.isShowing) {
+                //Dismissed in the exact window between the two isShowing checks - undo the bind we just did.
+                cameraProvider.unbindAll()
+                return@addListener
+            }
 
             cameraInitialized = true
-            if (torch == Torch.ForceOn) camera.setTorch(true, btnTorch)
+            //Only made visible/clickable now that `camera` is actually assigned - a tap before this point used to
+            //be able to hit an uninitialized `camera` and crash.
+            prepareTorch()
+            if (torch == Torch.ForceOn) {
+                isTorchOn = true
+                camera.setTorch(true, btnTorch, onError)
+            }
 
             scanJob = activity.lifecycleScope.launch(Dispatchers.IO) {
-                while (search) {
-                    val image = withContext(Dispatchers.Main) {
-                        viewFinder.bitmap
-                    }
-                    if (image != null) {
-                        scanBarcode(image) { barcodes ->
-                            if (search) {
-                                search = false
-                                onResult(barcodes)
-                                dialog.dismiss()
+                try {
+                    while (search) {
+                        val image = withContext(Dispatchers.Main) {
+                            viewFinder.bitmap
+                        }
+                        //Awaiting the decode here (instead of firing it and moving on) is what gives this loop
+                        //backpressure - the next frame is only grabbed once ML Kit is done with the current one.
+                        val barcodes = image?.let { scanBarcode(it) }
+                        if (barcodes != null) {
+                            //Back on the main thread deliberately - suspendCancellableCoroutine resumes scanBarcode()
+                            //on this loop's own IO dispatcher, not wherever ML Kit's listener happened to fire from.
+                            withContext(Dispatchers.Main) {
+                                if (search) {
+                                    search = false
+                                    onResult(barcodes)
+                                    dialog.dismiss()
+                                }
                             }
                         }
+                        delay(timeToWaitAfterScan)
                     }
-                    delay(timeToWaitAfterScan)
+                } finally {
+                    //Cleanup lives here now instead of in the dismiss listener, so it runs strictly *after* the loop
+                    //above has actually stopped, not concurrently with a still in-flight scanner.process() call.
+                    //NonCancellable so this block itself can't be torn down mid-cleanup by the very cancellation that
+                    //triggered it, and Dispatchers.Main because unbindAll()/torch icon updates require the main thread.
+                    withContext(Dispatchers.Main + NonCancellable) {
+                        camera.setTorch(false, btnTorch, onError)
+                        cameraProvider.unbindAll()
+                        scanner.close()
+                    }
                 }
             }
         }, ContextCompat.getMainExecutor(activity))
@@ -214,25 +327,32 @@ data class BarcodeScannerDialogV3(
             btnTorch.apply {
                 visibility = View.VISIBLE
                 setOnClickListener {
+                    if (!cameraInitialized) return@setOnClickListener
                     isTorchOn = isTorchOn.not()
-                    camera.setTorch(isTorchOn, btnTorch)
+                    camera.setTorch(isTorchOn, btnTorch, onError)
                 }
             }
         }
     }
 
-    private fun scanBarcode(bitmap: Bitmap, result: (List<Barcode>) -> Unit) {
+    private suspend fun scanBarcode(bitmap: Bitmap): List<Barcode>? {
         val start = System.currentTimeMillis()
         val image = InputImage.fromBitmap(bitmap, 0)
 
-        scanner.process(image)
-            .addOnSuccessListener { barcodes ->
-                resolveScanResult(barcodes)?.let {
-                    Log.d(TAG, "Detected ${it.size} barcode(s) in ${System.currentTimeMillis() - start}ms")
-                    result(it)
-                }
+        val barcodes = try {
+            scanner.process(image).await()
+        } catch (e: CancellationException) {
+            throw e //Never swallow cancellation - the scan loop must actually stop when the job is cancelled.
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                onError("Failed scanning barcode, in ${System.currentTimeMillis() - start}ms", e)
             }
-            .addOnFailureListener { onError("Failed scanning barcode, in ${System.currentTimeMillis() - start}ms", it) }
+            return null
+        }
+
+        return resolveScanResult(barcodes)?.also {
+            Log.d(TAG, "Detected ${it.size} barcode(s) in ${System.currentTimeMillis() - start}ms")
+        }
     }
 
     fun dismiss() {
@@ -270,7 +390,19 @@ internal fun resolveWindowSize(size: DialogSize, screenWidthPx: Int, screenHeigh
     return width to height
 }
 
-private fun Camera.setTorch(on: Boolean, imgBtn: ImageButton) {
+/**
+ * Suspends until [Task] completes, instead of registering fire-and-forget listeners. This is what lets the scan
+ * loop wait for one frame's ML Kit decode to finish before it captures the next one, instead of piling up
+ * overlapping [BarcodeScanning] calls when a device is too slow to keep up with [BarcodeScannerDialogV3]'s poll
+ * interval. Not added as a dependency on `kotlinx-coroutines-play-services` since this one function is all that's needed.
+ */
+private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
+    addOnSuccessListener { cont.resume(it) }
+    addOnFailureListener { cont.resumeWithException(it) }
+    addOnCanceledListener { cont.cancel() }
+}
+
+private fun Camera.setTorch(on: Boolean, imgBtn: ImageButton, onError: (msg: String, t: Throwable?) -> Unit) {
     try {
         cameraControl.enableTorch(on)
         imgBtn.setImageDrawable(
@@ -280,6 +412,6 @@ private fun Camera.setTorch(on: Boolean, imgBtn: ImageButton) {
             )
         )
     } catch (e: Exception) {
-        Log.e(TAG, "Error turning on torch")
+        onError("Error turning on torch", e)
     }
 }
