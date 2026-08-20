@@ -46,6 +46,7 @@ import kotlinx.coroutines.withContext
  * Use [BarcodeScannerContinuousDialog] if you ned continuous scanning!
  * Everything here can also be done with [BarcodeScannerContinuousDialog]. You may only use that one.
  */
+@Deprecated("Use BarcodeScannerDialogV3 instead")
 data class BarcodeScannerDialogV2(
     private val activity: ComponentActivity,
     private val barcodeFormats: List<Int> = listOf(Barcode.FORMAT_ALL_FORMATS),
