@@ -9,6 +9,8 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import bayern.kickner.barcode_scanner_library.BarcodeScannerDialogV2
+import bayern.kickner.barcode_scanner_library.BarcodeScannerDialogV3
+import bayern.kickner.barcode_scanner_library.DialogSize
 import bayern.kickner.barcode_scanner_library.ImageCaptureDialog
 import bayern.kickner.barcode_scanner_library.ImageCaptureResult
 import java.io.File
@@ -28,7 +30,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btn2).setOnClickListener {
-
+            BarcodeScannerDialogV3(this) { barcodes ->
+                val summary = barcodes.joinToString { "${it.rawValue} (format=${it.format})" }
+                Toast.makeText(this, "${barcodes.size} barcode(s): $summary", Toast.LENGTH_LONG).show()
+            }
         }
 
         findViewById<Button>(R.id.btn3).setOnClickListener {
