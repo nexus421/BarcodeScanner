@@ -22,7 +22,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -159,6 +158,16 @@ class BarcodeScannerDialogV3(
     //could otherwise let two near-simultaneous instances both see the guard as free.
     private val showingCameraPreview = permissionGranted && isAnyInstanceActive.compareAndSet(false, true)
 
+    //Backstop in case setOnDismissListener never fires at all (e.g. the Activity gets destroyed/leaked without
+    //properly dismissing the dialog first) - without this the guard could stay claimed forever. Only created when
+    //this instance actually claimed the guard, and explicitly removed again in the dismiss listener below - so a
+    //long-lived Activity showing many scan dialogs one after another doesn't keep accumulating stale observers.
+    private val destroyObserver: LifecycleEventObserver? = if (showingCameraPreview) {
+        LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_DESTROY) isAnyInstanceActive.set(false)
+        }
+    } else null
+
     init {
         dialog = when {
             permissionGranted.not() -> {
@@ -192,24 +201,18 @@ class BarcodeScannerDialogV3(
             } finally {
                 //Release the guard whenever this instance claimed it, regardless of whether binding the camera actually
                 //succeeded. Runs in `finally` so a throwing cleanup above - or a throwing onError - can never leave the
-                //flag stuck on true.
-                if (showingCameraPreview) isAnyInstanceActive.set(false)
+                //flag stuck on true. The backstop observer is removed here too - once the dialog is properly dismissed
+                //it's no longer needed, and leaving it registered would otherwise leak this instance off the Activity's
+                //lifecycle for as long as the Activity itself stays alive.
+                if (showingCameraPreview) {
+                    isAnyInstanceActive.set(false)
+                    destroyObserver?.let { activity.lifecycle.removeObserver(it) }
+                }
                 onDismiss?.invoke()
             }
         }
 
-        if (showingCameraPreview) {
-            //Backstop in case setOnDismissListener never fires at all (e.g. the Activity gets destroyed/leaked
-            //without properly dismissing the dialog first) - without this the guard could stay claimed forever.
-            activity.lifecycle.addObserver(object : LifecycleEventObserver {
-                override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                    if (event == Lifecycle.Event.ON_DESTROY) {
-                        isAnyInstanceActive.set(false)
-                        source.lifecycle.removeObserver(this)
-                    }
-                }
-            })
-        }
+        destroyObserver?.let { activity.lifecycle.addObserver(it) }
 
         dialog.show()
 
@@ -300,7 +303,15 @@ class BarcodeScannerDialogV3(
                             withContext(Dispatchers.Main) {
                                 if (search) {
                                     search = false
-                                    onResult(barcodes)
+                                    //Guarded like every other caller-supplied hook in this class - an exception thrown
+                                    //by the caller's onResult would otherwise leave lifecycleScope's coroutine with an
+                                    //uncaught exception (no handler installed), crashing the whole app and skipping
+                                    //dialog.dismiss() below.
+                                    try {
+                                        onResult(barcodes)
+                                    } catch (e: Exception) {
+                                        onError("onResult threw", e)
+                                    }
                                     dialog.dismiss()
                                 }
                             }
@@ -313,9 +324,15 @@ class BarcodeScannerDialogV3(
                     //NonCancellable so this block itself can't be torn down mid-cleanup by the very cancellation that
                     //triggered it, and Dispatchers.Main because unbindAll()/torch icon updates require the main thread.
                     withContext(Dispatchers.Main + NonCancellable) {
-                        camera.setTorch(false, btnTorch, onError)
-                        cameraProvider.unbindAll()
-                        scanner.close()
+                        //Wrapped in try/catch so a throwing unbindAll()/close() can't crash the app through this
+                        //coroutine's uncaught exception path - lifecycleScope installs no handler of its own for that.
+                        try {
+                            camera.setTorch(false, btnTorch, onError)
+                            cameraProvider.unbindAll()
+                            scanner.close()
+                        } catch (e: Exception) {
+                            onError("Error while cleaning up the barcode scanner", e)
+                        }
                     }
                 }
             }
@@ -396,13 +413,13 @@ internal fun resolveWindowSize(size: DialogSize, screenWidthPx: Int, screenHeigh
  * overlapping [BarcodeScanning] calls when a device is too slow to keep up with [BarcodeScannerDialogV3]'s poll
  * interval. Not added as a dependency on `kotlinx-coroutines-play-services` since this one function is all that's needed.
  */
-private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
+internal suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
     addOnSuccessListener { cont.resume(it) }
     addOnFailureListener { cont.resumeWithException(it) }
     addOnCanceledListener { cont.cancel() }
 }
 
-private fun Camera.setTorch(on: Boolean, imgBtn: ImageButton, onError: (msg: String, t: Throwable?) -> Unit) {
+internal fun Camera.setTorch(on: Boolean, imgBtn: ImageButton, onError: (msg: String, t: Throwable?) -> Unit) {
     try {
         cameraControl.enableTorch(on)
         imgBtn.setImageDrawable(
