@@ -42,7 +42,7 @@ Google's ML Kit and the CameraX API.
    ```kotlin
    // app/build.gradle.kts
    dependencies {
-       implementation("bayern.kickner:BarcodeScanner:2.2.3")
+       implementation("bayern.kickner:BarcodeScanner:3.0.0")
    }
    ```
 
